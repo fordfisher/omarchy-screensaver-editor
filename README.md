@@ -14,6 +14,14 @@ npm run dev
 
 Opens on [http://127.0.0.1:43147](http://127.0.0.1:43147) (Vite).
 
+The original three-glyph grid editor (█ ▄ ▀, plus a separate preview) lives in `legacy/`. Run it on Omarchy with:
+
+```bash
+python3 legacy/screensaver-editor.py
+```
+
+It serves http://127.0.0.1:8099 and writes `~/.config/omarchy/branding/screensaver.txt`.
+
 ## Tools
 
 | Key | Tool |
