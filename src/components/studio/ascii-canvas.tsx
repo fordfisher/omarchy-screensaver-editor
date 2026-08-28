@@ -3,7 +3,6 @@
 import { useMemo, useRef, type PointerEvent } from "react";
 
 import { getCell, type AsciiDoc } from "@/lib/document";
-import { cn } from "@/lib/utils";
 
 import type { Cell, Marquee, TypeSession } from "@/components/studio/types";
 
@@ -154,21 +153,22 @@ export function AsciiCanvas({
           gridTemplateRows: `repeat(${doc.rows}, ${ch}px)`,
           width: doc.cols * cw,
           height: doc.rows * ch,
-          background: paper,
+          backgroundColor: paper,
+          backgroundImage: showGrid
+            ? "linear-gradient(rgba(186, 200, 224, 0.38) 1px, transparent 1px), linear-gradient(90deg, rgba(186, 200, 224, 0.38) 1px, transparent 1px)"
+            : undefined,
+          backgroundSize: `${cw}px ${ch}px`,
           color: ink,
           fontSize: Math.max(8, Math.floor(ch * 0.9)),
           fontFamily:
             "var(--font-noto-mono), var(--font-geist-mono), ui-monospace, monospace",
-          boxShadow: "0 0 0 1px rgba(255,255,255,0.08)",
+          boxShadow: "0 0 0 1px rgba(186, 200, 224, 0.42)",
         }}
       >
         {cells.map((glyph, i) => (
           <span
             key={i}
-            className={cn(
-              "relative flex items-center justify-center overflow-hidden",
-              showGrid && zoom >= 12 && "shadow-[inset_0_0_0_1px_rgba(255,255,255,0.06)]",
-            )}
+            className="relative flex items-center justify-center overflow-hidden"
           >
             <Glyph ch={glyph} />
           </span>
