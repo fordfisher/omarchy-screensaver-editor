@@ -62,7 +62,7 @@ Open [http://127.0.0.1:43147](http://127.0.0.1:43147).
 
 Press any printable key to set the brush (when you're not typing). Wheel zooms. Middle-drag or right-drag pans.
 
-Type: click a cell, type `OMARCHY 4.0!`, Enter commits, Esc cancels. The glyphs land where you clicked.
+Type: pick the Type tool, enter `OMARCHY 4.0!`, then click the canvas. A ghost follows the pointer. Esc clears the field. The glyphs land where you click.
 
 **File → Convert JPG/PNG** (or **Image → Convert JPG/PNG**) turns a photo into ASCII. Each pixel is a grayscale percent: **0% black → dense glyph**, **100% white → empty**. Drag the black/white points to stretch the range, then stamp onto the canvas.
 

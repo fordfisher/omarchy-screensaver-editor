@@ -17,10 +17,10 @@ export type Marquee = {
   y1: number;
 };
 
-export type TypeSession = {
+export type TypeGhost = {
   x: number;
   y: number;
-  buffer: string;
+  lines: string[];
 };
 
 export const PRINTABLE_ASCII: string[] = Array.from({ length: 95 }, (_, i) =>

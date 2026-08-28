@@ -4,7 +4,7 @@ import { useMemo, useRef, type PointerEvent } from "react";
 
 import { getCell, type AsciiDoc } from "@/lib/document";
 
-import type { Cell, Marquee, TypeSession } from "@/components/studio/types";
+import type { Cell, Marquee, TypeGhost } from "@/components/studio/types";
 
 type Props = {
   doc: AsciiDoc;
@@ -15,7 +15,7 @@ type Props = {
   paper: string;
   hover: Cell | null;
   marquee: Marquee | null;
-  typeSession: TypeSession | null;
+  typeGhost: TypeGhost | null;
   cursor: string;
   onHover: (cell: Cell | null) => void;
   onCellDown: (cell: Cell, event: PointerEvent<HTMLDivElement>) => void;
@@ -69,7 +69,7 @@ export function AsciiCanvas({
   paper,
   hover,
   marquee,
-  typeSession,
+  typeGhost,
   cursor,
   onHover,
   onCellDown,
@@ -199,16 +199,28 @@ export function AsciiCanvas({
         />
       ) : null}
 
-      {typeSession ? (
-        <div
-          className="pointer-events-none absolute z-10 w-0.5 animate-pulse bg-emerald-300"
-          style={{
-            left: pan.x + typeSession.x * cw,
-            top: pan.y + typeSession.y * ch,
-            height: ch,
-          }}
-        />
-      ) : null}
+      {typeGhost
+        ? typeGhost.lines.flatMap((line, dy) =>
+            Array.from(line).flatMap((glyph, dx) => {
+              if (glyph === " " || glyph === "") return [];
+              return [
+                <div
+                  key={`${dx}-${dy}`}
+                  className="pointer-events-none absolute z-10 flex items-center justify-center overflow-hidden text-emerald-200/70"
+                  style={{
+                    left: pan.x + (typeGhost.x + dx) * cw,
+                    top: pan.y + (typeGhost.y + dy) * ch,
+                    width: cw,
+                    height: ch,
+                    fontSize: Math.max(8, Math.floor(ch * 0.9)),
+                  }}
+                >
+                  <Glyph ch={glyph} />
+                </div>,
+              ];
+            }),
+          )
+        : null}
     </div>
   );
 }

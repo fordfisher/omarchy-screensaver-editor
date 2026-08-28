@@ -72,7 +72,7 @@ import {
   type Cell,
   type Marquee,
   type Tool,
-  type TypeSession,
+  type TypeGhost,
 } from "@/components/studio/types";
 
 const INK = "#cdd6f4";
@@ -100,7 +100,7 @@ export function Studio() {
   const [showGrid, setShowGrid] = useState(true);
   const [hover, setHover] = useState<Cell | null>(null);
   const [marquee, setMarquee] = useState<Marquee | null>(null);
-  const [typeSession, setTypeSession] = useState<TypeSession | null>(null);
+  const [typeText, setTypeText] = useState("");
   const [spaceDown, setSpaceDown] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [resizeOpen, setResizeOpen] = useState(false);
@@ -119,7 +119,6 @@ export function Studio() {
   const redo = useRef<AsciiDoc[]>([]);
   const strokeBase = useRef<AsciiDoc | null>(null);
   const strokeOrigin = useRef<AsciiDoc | null>(null);
-  const typeBase = useRef<AsciiDoc | null>(null);
   const dragging = useRef(false);
   const lineStart = useRef<Cell | null>(null);
   const movePatch = useRef<ReturnType<typeof copyRect> | null>(null);
@@ -148,50 +147,9 @@ export function Studio() {
     setDirty(true);
   }, [doc]);
 
-  const endTypeSession = useCallback(
-    (keep: boolean) => {
-      if (!typeSession) return;
-      if (!keep && typeBase.current) {
-        setDoc(typeBase.current);
-      } else if (keep && typeBase.current && typeSession.buffer.length > 0) {
-        undo.current = [...undo.current, cloneDoc(typeBase.current)].slice(
-          -HISTORY_LIMIT,
-        );
-        redo.current = [];
-        setDirty(true);
-      }
-      typeBase.current = null;
-      setTypeSession(null);
-    },
-    [typeSession],
-  );
-
-  const startTypeAt = useCallback(
-    (cell: Cell) => {
-      endTypeSession(true);
-      typeBase.current = cloneDoc(doc);
-      setTypeSession({ x: cell.x, y: cell.y, buffer: "" });
-      queueMicrotask(() => typeInputRef.current?.focus());
-    },
-    [doc, endTypeSession],
-  );
-
-  const applyTypeBuffer = useCallback(
-    (buffer: string) => {
-      if (!typeSession) return;
-      const next = cloneDoc(typeBase.current ?? doc);
-      if (buffer.length > 0) {
-        stampLines(next, typeSession.x, typeSession.y, renderFiglet(buffer));
-      }
-      setDoc(next);
-      setTypeSession({ ...typeSession, buffer });
-    },
-    [doc, typeSession],
-  );
-
   useEffect(() => {
-    if (typeSession) typeInputRef.current?.focus();
-  }, [typeSession]);
+    if (tool === "type") typeInputRef.current?.focus();
+  }, [tool]);
 
   const paintAt = useCallback(
     (target: AsciiDoc, cell: Cell, ch: string) => {
@@ -203,7 +161,6 @@ export function Studio() {
   const onCellDown = useCallback(
     (cell: Cell, event: PointerEvent<HTMLDivElement>) => {
       if (spaceDown || event.button === 1) return;
-      if (tool !== "type") endTypeSession(true);
 
       if (event.button === 2) {
         setBrush(getCell(doc, cell.x, cell.y));
@@ -213,7 +170,16 @@ export function Studio() {
       dragging.current = true;
 
       if (tool === "type") {
-        startTypeAt(cell);
+        dragging.current = false;
+        if (!typeText) {
+          toast("Type the wordmark, then click where it should land");
+          typeInputRef.current?.focus();
+          return;
+        }
+        const next = cloneDoc(doc);
+        stampLines(next, cell.x, cell.y, renderFiglet(typeText));
+        commit(next);
+        toast("Placed on the canvas");
         return;
       }
 
@@ -269,7 +235,7 @@ export function Studio() {
       }
       setDoc(next);
     },
-    [brush, commit, doc, endTypeSession, marquee, paintAt, spaceDown, startTypeAt, tool],
+    [brush, commit, doc, marquee, paintAt, spaceDown, tool, typeText],
   );
 
   const onCellMove = useCallback(
@@ -401,14 +367,12 @@ export function Studio() {
 
   const newBlank = () => {
     snapshot("Before blank canvas");
-    endTypeSession(false);
     commit(createDoc(doc.cols, doc.rows));
     setMarquee(null);
   };
 
   const newWordmark = (text = "OMARCHY") => {
     snapshot("Before new wordmark");
-    endTypeSession(false);
     commit(wordmarkDoc(text));
     setMarquee(null);
   };
@@ -416,7 +380,6 @@ export function Studio() {
   const openTextFile = async (file: File) => {
     const text = await file.text();
     snapshot("Before open");
-    endTypeSession(false);
     commit(fromText(text, 40, 12));
     setMarquee(null);
     toast("Opened " + file.name);
@@ -439,7 +402,6 @@ export function Studio() {
 
   const restoreVersion = (version: ScreensaverVersion) => {
     snapshot("Before restore");
-    endTypeSession(false);
     commit(fromText(version.text, 40, 12));
     setMarquee(null);
     setVersionsOpen(false);
@@ -458,13 +420,43 @@ export function Studio() {
         return;
       }
 
+      const meta = event.metaKey || event.ctrlKey;
+
+      if (tool === "type") {
+        if (event.code === "Space") {
+          setTypeText((value) => value + " ");
+          event.preventDefault();
+          return;
+        }
+        if (event.key === "Escape") {
+          setTypeText("");
+          event.preventDefault();
+          return;
+        }
+        if (event.key === "Backspace") {
+          setTypeText((value) => value.slice(0, -1));
+          event.preventDefault();
+          return;
+        }
+        if (event.key === "Enter") {
+          event.preventDefault();
+          typeInputRef.current?.focus();
+          toast("Click the canvas to place it");
+          return;
+        }
+        if (event.key.length === 1 && !meta) {
+          setTypeText((value) => value + event.key);
+          event.preventDefault();
+          return;
+        }
+      }
+
       if (event.code === "Space") {
         setSpaceDown(true);
         event.preventDefault();
         return;
       }
 
-      const meta = event.metaKey || event.ctrlKey;
       if (meta && event.key.toLowerCase() === "z") {
         event.preventDefault();
         if (event.shiftKey) redoOnce();
@@ -494,40 +486,6 @@ export function Studio() {
         }
         void navigator.clipboard.writeText(lines.join("\n"));
         toast("Copied selection");
-        return;
-      }
-
-      if (typeSession) {
-        if (event.key === "Escape") {
-          endTypeSession(false);
-          event.preventDefault();
-          return;
-        }
-        if (event.key === "Enter" && !event.shiftKey) {
-          endTypeSession(true);
-          event.preventDefault();
-          return;
-        }
-        if (event.key === "Backspace") {
-          const buffer = typeSession.buffer.slice(0, -1);
-          const next = cloneDoc(typeBase.current ?? doc);
-          if (buffer.length > 0) {
-            stampLines(next, typeSession.x, typeSession.y, renderFiglet(buffer));
-          }
-          setDoc(next);
-          setTypeSession({ ...typeSession, buffer });
-          event.preventDefault();
-          return;
-        }
-        if (event.key.length === 1 && !meta) {
-          const buffer = typeSession.buffer + event.key;
-          const art = renderFiglet(buffer);
-          const next = cloneDoc(typeBase.current ?? doc);
-          stampLines(next, typeSession.x, typeSession.y, art);
-          setDoc(next);
-          setTypeSession({ ...typeSession, buffer });
-          event.preventDefault();
-        }
         return;
       }
 
@@ -565,17 +523,25 @@ export function Studio() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onUp);
     };
-  }, [doc, endTypeSession, marquee, redoOnce, saveCurrent, typeSession, undoOnce]);
+  }, [doc, marquee, redoOnce, saveCurrent, tool, undoOnce]);
 
   const cursor = spaceDown
     ? "grab"
     : tool === "type"
-      ? "text"
+      ? "cell"
       : tool === "eyedropper"
         ? "crosshair"
         : "cell";
 
   const hoverChar = hover ? getCell(doc, hover.x, hover.y) : null;
+  const typeArt = useMemo(
+    () => (typeText ? renderFiglet(typeText) : []),
+    [typeText],
+  );
+  const typeGhost: TypeGhost | null =
+    tool === "type" && hover && typeArt.length > 0
+      ? { x: hover.x, y: hover.y, lines: typeArt }
+      : null;
   const tools: Array<{ id: Tool; icon: ReactNode; label: string }> = [
     { id: "select", icon: <MousePointer2 />, label: "Move / marquee (V)" },
     { id: "pencil", icon: <Pencil />, label: "Pencil (B)" },
@@ -780,7 +746,6 @@ export function Studio() {
                 aria-pressed={tool === item.id}
                 className={cn(tool === item.id && "bg-zinc-800 text-emerald-300")}
                 onClick={() => {
-                  endTypeSession(true);
                   setTool(item.id);
                 }}
               >
@@ -793,31 +758,27 @@ export function Studio() {
             <div className="flex h-9 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/80 px-3 text-xs text-zinc-400">
               {tool === "type" ? (
                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="shrink-0">Type on the grid</span>
-                  {typeSession ? (
-                    <input
-                      ref={typeInputRef}
-                      data-testid="type-input"
-                      value={typeSession.buffer}
-                      autoComplete="off"
-                      aria-label="Wordmark text"
-                      placeholder="Type here — it stamps where you clicked"
-                      className="h-7 min-w-0 flex-1 rounded border border-emerald-700 bg-black px-2 font-mono text-sm text-emerald-200 outline-none"
-                      onChange={(event) => applyTypeBuffer(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Enter") {
-                          event.preventDefault();
-                          endTypeSession(true);
-                        }
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          endTypeSession(false);
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span>Click the paper, then type. Enter commits.</span>
-                  )}
+                  <span className="shrink-0">Type, then click to place</span>
+                  <input
+                    ref={typeInputRef}
+                    data-testid="type-input"
+                    value={typeText}
+                    autoComplete="off"
+                    aria-label="Wordmark text"
+                    placeholder="OMARCHY 4.0!"
+                    className="h-7 min-w-0 flex-1 rounded border border-emerald-700 bg-black px-2 font-mono text-sm text-emerald-200 outline-none"
+                    onChange={(event) => setTypeText(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        toast("Click the canvas to place it");
+                      }
+                      if (event.key === "Escape") {
+                        event.preventDefault();
+                        setTypeText("");
+                      }
+                    }}
+                  />
                 </div>
               ) : (
                 <>
@@ -842,7 +803,7 @@ export function Studio() {
               paper={PAPER}
               hover={hover}
               marquee={marquee}
-              typeSession={typeSession}
+              typeGhost={typeGhost}
               cursor={cursor}
               onHover={setHover}
               onCellDown={onCellDown}
@@ -918,8 +879,11 @@ export function Studio() {
           </span>
           <Separator orientation="vertical" className="h-3" />
           <span className="truncate">
-            {tool}
-            {typeSession ? ` · typing “${typeSession.buffer}”` : ""}
+            {tool === "type"
+              ? typeText
+                ? `type · click to place “${typeText}”`
+                : "type · enter text, then click"
+              : tool}
           </span>
           <span className="ml-auto truncate text-zinc-600">
             {dirty ? "unsaved" : "saved"} ·{" "}
@@ -1069,7 +1033,7 @@ export function Studio() {
           <p>Any printable key sets the brush (when not typing)</p>
           <p>Ctrl/⌘ Z undo · Shift+Ctrl/⌘ Z redo · Ctrl/⌘ S save</p>
           <p>Wheel zoom · middle-drag or right-drag pan · Space grab</p>
-          <p>Type tool uses the full Delta Corps Priest set, not just letters.</p>
+          <p>T type: enter the wordmark, then click the canvas to place it.</p>
           <p>File → Convert JPG/PNG maps grayscale 0–100% onto the canvas.</p>
           <p>File → Versions restores earlier screensaver.txt copies (OMARCHY is pinned).</p>
         </div>
