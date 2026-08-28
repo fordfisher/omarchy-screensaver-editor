@@ -7,7 +7,6 @@ import {
   useRef,
   useState,
   type PointerEvent,
-  type ReactElement,
   type ReactNode,
 } from "react";
 import { toast, Toaster } from "sonner";
@@ -28,7 +27,7 @@ import {
   Undo2,
 } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -48,12 +47,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 import { imageDataToLines, RAMPS } from "@/lib/ascii-image";
 import { wordmarkDoc } from "@/lib/defaults";
 import {
@@ -116,21 +109,6 @@ function loadImageFile(file: File): Promise<HTMLImageElement> {
     };
     img.src = url;
   });
-}
-
-function Tip({
-  label,
-  children,
-}: {
-  label: string;
-  children: ReactElement;
-}) {
-  return (
-    <Tooltip>
-      <TooltipTrigger render={children} />
-      <TooltipContent side="right">{label}</TooltipContent>
-    </Tooltip>
-  );
 }
 
 export function Studio() {
@@ -224,7 +202,7 @@ export function Studio() {
   );
 
   const onCellDown = useCallback(
-    (cell: Cell, event: PointerEvent<HTMLCanvasElement>) => {
+    (cell: Cell, event: PointerEvent<HTMLDivElement>) => {
       if (spaceDown || event.button === 1) return;
       if (tool !== "type") endTypeSession(true);
 
@@ -574,15 +552,15 @@ export function Studio() {
   ];
 
   return (
-    <TooltipProvider delay={250}>
-      <div className="flex h-dvh min-h-0 flex-col bg-zinc-950 text-zinc-100">
+    <>
+    <div className="flex h-dvh min-h-0 flex-col bg-zinc-950 text-zinc-100">
         <header className="flex h-10 shrink-0 items-center gap-1 border-b border-zinc-800 bg-zinc-900 px-2">
           <span className="px-2 font-mono text-xs tracking-wide text-zinc-400">
             Omarchy Screensaver Studio
           </span>
-          <DropdownMenu>
+            <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button variant="ghost" size="sm" />}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
               File
             </DropdownMenuTrigger>
@@ -627,9 +605,9 @@ export function Studio() {
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <DropdownMenu>
+            <DropdownMenu>
             <DropdownMenuTrigger
-              render={<Button variant="ghost" size="sm" />}
+              className={buttonVariants({ variant: "ghost", size: "sm" })}
             >
               Image
             </DropdownMenuTrigger>
@@ -719,21 +697,21 @@ export function Studio() {
         <div className="flex min-h-0 flex-1">
           <aside className="flex w-12 shrink-0 flex-col items-center gap-1 border-r border-zinc-800 bg-zinc-900 py-2">
             {tools.map((item) => (
-              <Tip key={item.id} label={item.label}>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={item.label}
-                  aria-pressed={tool === item.id}
-                  className={cn(tool === item.id && "bg-zinc-800 text-emerald-300")}
-                  onClick={() => {
-                    endTypeSession(true);
-                    setTool(item.id);
-                  }}
-                >
-                  {item.icon}
-                </Button>
-              </Tip>
+              <Button
+                key={item.id}
+                variant="ghost"
+                size="icon-sm"
+                title={item.label}
+                aria-label={item.label}
+                aria-pressed={tool === item.id}
+                className={cn(tool === item.id && "bg-zinc-800 text-emerald-300")}
+                onClick={() => {
+                  endTypeSession(true);
+                  setTool(item.id);
+                }}
+              >
+                {item.icon}
+              </Button>
             ))}
           </aside>
 
@@ -1054,7 +1032,7 @@ export function Studio() {
       </Dialog>
 
       <Toaster theme="dark" position="bottom-right" />
-    </TooltipProvider>
+    </>
   );
 }
 
