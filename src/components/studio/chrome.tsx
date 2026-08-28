@@ -123,7 +123,7 @@ export function Modal({
         aria-labelledby="studio-modal-title"
         className={cn(
           "w-full rounded-xl border border-zinc-700 bg-zinc-900 p-4 text-zinc-100 shadow-2xl",
-          wide ? "max-w-lg" : "max-w-md",
+          wide ? "max-w-3xl" : "max-w-md",
         )}
         onClick={(event) => event.stopPropagation()}
       >

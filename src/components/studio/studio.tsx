@@ -14,7 +14,6 @@ import {
   Download,
   Eraser,
   Grid3x3,
-  ImageIcon,
   Minus,
   MousePointer2,
   PaintBucket,
@@ -33,7 +32,7 @@ import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { BarItem, BarMenu, BarSep, Modal } from "@/components/studio/chrome";
-import { imageDataToLines, RAMPS } from "@/lib/ascii-image";
+import { ImageConverter } from "@/components/studio/converter";
 import { wordmarkDoc } from "@/lib/defaults";
 import {
   cloneDoc,
@@ -81,22 +80,6 @@ function downloadText(filename: string, text: string) {
   URL.revokeObjectURL(url);
 }
 
-function loadImageFile(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      resolve(img);
-    };
-    img.onerror = () => {
-      URL.revokeObjectURL(url);
-      reject(new Error("Could not read that image."));
-    };
-    img.src = url;
-  });
-}
-
 export function Studio() {
   const [doc, setDoc] = useState<AsciiDoc>(() => wordmarkDoc("OMARCHY"));
   const [tool, setTool] = useState<Tool>("pencil");
@@ -112,14 +95,12 @@ export function Studio() {
   const [resizeOpen, setResizeOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
-  const [placeOpen, setPlaceOpen] = useState(false);
+  const [converterOpen, setConverterOpen] = useState(false);
   const [fileMenu, setFileMenu] = useState(false);
   const [imageMenu, setImageMenu] = useState(false);
   const typeInputRef = useRef<HTMLInputElement>(null);
   const [resizeCols, setResizeCols] = useState(100);
   const [resizeRows, setResizeRows] = useState(28);
-  const [rampName, setRampName] = useState<keyof typeof RAMPS>("full");
-  const [invertPlace, setInvertPlace] = useState(false);
 
   const undo = useRef<AsciiDoc[]>([]);
   const redo = useRef<AsciiDoc[]>([]);
@@ -130,8 +111,6 @@ export function Studio() {
   const lineStart = useRef<Cell | null>(null);
   const movePatch = useRef<ReturnType<typeof copyRect> | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
-  const imageRef = useRef<HTMLInputElement>(null);
-  const pendingImage = useRef<File | null>(null);
 
   const commit = useCallback((next: AsciiDoc, from = doc) => {
     undo.current = [...undo.current, cloneDoc(from)].slice(-HISTORY_LIMIT);
@@ -391,24 +370,7 @@ export function Studio() {
     toast("Opened " + file.name);
   };
 
-  const placeImage = async (file: File) => {
-    const img = await loadImageFile(file);
-    const canvas = document.createElement("canvas");
-    canvas.width = doc.cols;
-    canvas.height = doc.rows;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    const scale = Math.min(doc.cols / img.width, doc.rows / img.height);
-    const w = Math.max(1, Math.round(img.width * scale));
-    const h = Math.max(1, Math.round(img.height * scale));
-    const ox = Math.floor((doc.cols - w) / 2);
-    const oy = Math.floor((doc.rows - h) / 2);
-    ctx.drawImage(img, ox, oy, w, h);
-    const data = ctx.getImageData(0, 0, doc.cols, doc.rows);
-    const ramp = RAMPS[rampName];
-    const lines = imageDataToLines(data, ramp, invertPlace);
+  const stampConverted = (lines: string[]) => {
     const next = cloneDoc(doc);
     stampLines(next, 0, 0, lines, false);
     commit(next);
@@ -600,11 +562,11 @@ export function Studio() {
             </BarItem>
             <BarItem
               onClick={() => {
-                imageRef.current?.click();
+                setConverterOpen(true);
                 setFileMenu(false);
               }}
             >
-              Place image…
+              Convert JPG/PNG…
             </BarItem>
             <BarSep />
             <BarItem
@@ -657,12 +619,11 @@ export function Studio() {
             </BarItem>
             <BarItem
               onClick={() => {
-                pendingImage.current = null;
-                setPlaceOpen(true);
+                setConverterOpen(true);
                 setImageMenu(false);
               }}
             >
-              Image → ASCII settings
+              Convert JPG/PNG…
             </BarItem>
           </BarMenu>
           <Button
@@ -904,18 +865,12 @@ export function Studio() {
           event.target.value = "";
         }}
       />
-      <input
-        ref={imageRef}
-        type="file"
-        accept="image/png,image/jpeg,image/webp,image/svg+xml"
-        className="hidden"
-        onChange={(event) => {
-          const file = event.target.files?.[0];
-          event.target.value = "";
-          if (!file) return;
-          pendingImage.current = file;
-          setPlaceOpen(true);
-        }}
+      <ImageConverter
+        open={converterOpen}
+        cols={doc.cols}
+        rows={doc.rows}
+        onClose={() => setConverterOpen(false)}
+        onStamp={stampConverted}
       />
 
       <Modal
@@ -964,61 +919,6 @@ export function Studio() {
               onChange={(e) => setResizeRows(Number(e.target.value))}
             />
           </div>
-        </div>
-      </Modal>
-
-      <Modal
-        open={placeOpen}
-        title="Place image as ASCII"
-        description="Stamps onto this canvas. Full ASCII uses every printable character. Omarchy 3 is the old █ ▀ ▄ converter."
-        onClose={() => setPlaceOpen(false)}
-        footer={
-          <>
-            <Button variant="outline" onClick={() => setPlaceOpen(false)}>
-              Close
-            </Button>
-            <Button
-              onClick={() => {
-                if (pendingImage.current) {
-                  void placeImage(pendingImage.current);
-                  pendingImage.current = null;
-                  setPlaceOpen(false);
-                  return;
-                }
-                imageRef.current?.click();
-                setPlaceOpen(false);
-              }}
-            >
-              <ImageIcon data-icon="inline-start" />
-              Choose image
-            </Button>
-          </>
-        }
-      >
-        <div className="grid gap-3">
-          <div className="grid gap-1.5">
-            <Label htmlFor="ramp">Character ramp</Label>
-            <select
-              id="ramp"
-              className="h-8 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm"
-              value={rampName}
-              onChange={(e) =>
-                setRampName(e.target.value as keyof typeof RAMPS)
-              }
-            >
-              <option value="full">Full ASCII (all 95)</option>
-              <option value="omarchy3">Omarchy 3 (█ ▀ ▄)</option>
-              <option value="blocks">Blocks (█▓▒░)</option>
-            </select>
-          </div>
-          <label className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={invertPlace}
-              onChange={(e) => setInvertPlace(e.target.checked)}
-            />
-            Invert (light logo on dark)
-          </label>
         </div>
       </Modal>
 
@@ -1087,6 +987,7 @@ export function Studio() {
           <p>Ctrl/⌘ Z undo · Shift+Ctrl/⌘ Z redo · Ctrl/⌘ S save</p>
           <p>Wheel zoom · middle-drag or right-drag pan · Space grab</p>
           <p>Type tool uses the full Delta Corps Priest set, not just letters.</p>
+          <p>File → Convert JPG/PNG maps grayscale 0–100% onto the canvas.</p>
         </div>
       </Modal>
 

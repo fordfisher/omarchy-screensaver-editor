@@ -64,7 +64,7 @@ Press any printable key to set the brush (when you're not typing). Wheel zooms. 
 
 Type: click a cell, type `OMARCHY 4.0!`, Enter commits, Esc cancels. The glyphs land where you clicked.
 
-**File → Place image** stamps a PNG/JPEG/WebP onto the grid. Full ASCII is the default ramp. Pick **Omarchy 3** if you want the old █ ▀ ▄ look.
+**File → Convert JPG/PNG** (or **Image → Convert JPG/PNG**) turns a photo into ASCII. Each pixel is a grayscale percent: **0% black → dense glyph**, **100% white → empty**. Drag the black/white points to stretch the range, then stamp onto the canvas.
 
 ## Put it on the screensaver
 
