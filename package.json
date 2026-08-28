@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --hostname 0.0.0.0 --port 43147",
-    "build": "next build",
-    "start": "next start --hostname 0.0.0.0 --port 43147",
-    "lint": "eslint",
+    "dev": "vite --host 0.0.0.0 --port 43147",
+    "build": "tsc --noEmit && vite build",
+    "start": "vite preview --host 0.0.0.0 --port 43147",
+    "lint": "eslint src",
     "test": "tsx --test src/lib/font.test.ts src/lib/document.test.ts src/lib/ascii-image.test.ts src/lib/defaults.test.ts"
   },
   "dependencies": {
@@ -25,13 +25,16 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@vitejs/plugin-react": "^4.7.0",
     "eslint": "^9",
     "eslint-config-next": "16.3.3",
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vite": "^6.4.3"
   }
 }

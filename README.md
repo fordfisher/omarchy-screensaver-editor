@@ -12,7 +12,7 @@ npm test
 npm run dev
 ```
 
-Opens on [http://127.0.0.1:43147](http://127.0.0.1:43147).
+Opens on [http://127.0.0.1:43147](http://127.0.0.1:43147) (Vite).
 
 ## Tools
 
