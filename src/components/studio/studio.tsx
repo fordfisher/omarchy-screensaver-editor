@@ -27,26 +27,12 @@ import {
   Undo2,
 } from "lucide-react";
 
-import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { BarItem, BarMenu, BarSep, Modal } from "@/components/studio/chrome";
 import { imageDataToLines, RAMPS } from "@/lib/ascii-image";
 import { wordmarkDoc } from "@/lib/defaults";
 import {
@@ -127,6 +113,9 @@ export function Studio() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
   const [placeOpen, setPlaceOpen] = useState(false);
+  const [fileMenu, setFileMenu] = useState(false);
+  const [imageMenu, setImageMenu] = useState(false);
+  const typeInputRef = useRef<HTMLInputElement>(null);
   const [resizeCols, setResizeCols] = useState(100);
   const [resizeRows, setResizeRows] = useState(28);
   const [rampName, setRampName] = useState<keyof typeof RAMPS>("full");
@@ -190,9 +179,27 @@ export function Studio() {
       endTypeSession(true);
       typeBase.current = cloneDoc(doc);
       setTypeSession({ x: cell.x, y: cell.y, buffer: "" });
+      queueMicrotask(() => typeInputRef.current?.focus());
     },
     [doc, endTypeSession],
   );
+
+  const applyTypeBuffer = useCallback(
+    (buffer: string) => {
+      if (!typeSession) return;
+      const next = cloneDoc(typeBase.current ?? doc);
+      if (buffer.length > 0) {
+        stampLines(next, typeSession.x, typeSession.y, renderFiglet(buffer));
+      }
+      setDoc(next);
+      setTypeSession({ ...typeSession, buffer });
+    },
+    [doc, typeSession],
+  );
+
+  useEffect(() => {
+    if (typeSession) typeInputRef.current?.focus();
+  }, [typeSession]);
 
   const paintAt = useCallback(
     (target: AsciiDoc, cell: Cell, ch: string) => {
@@ -554,84 +561,116 @@ export function Studio() {
   return (
     <>
     <div className="flex h-dvh min-h-0 flex-col bg-zinc-950 text-zinc-100">
-        <header className="flex h-10 shrink-0 items-center gap-1 border-b border-zinc-800 bg-zinc-900 px-2">
+        <header className="relative z-40 flex h-10 shrink-0 items-center gap-1 border-b border-zinc-800 bg-zinc-900 px-2">
           <span className="px-2 font-mono text-xs tracking-wide text-zinc-400">
             Omarchy Screensaver Studio
           </span>
-            <DropdownMenu>
-            <DropdownMenuTrigger
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
+          <BarMenu
+            label="File"
+            open={fileMenu}
+            onToggle={() => {
+              setFileMenu((v) => !v);
+              setImageMenu(false);
+            }}
+            onClose={() => setFileMenu(false)}
+          >
+            <BarItem
+              onClick={() => {
+                newWordmark("OMARCHY");
+                setFileMenu(false);
+              }}
             >
-              File
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-52">
-              <DropdownMenuItem
-                onClick={() => newWordmark("OMARCHY")}
-              >
-                New from OMARCHY
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={newBlank}>Blank canvas</DropdownMenuItem>
-              <DropdownMenuItem onClick={() => fileRef.current?.click()}>
-                Open screensaver.txt…
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  imageRef.current?.click();
-                }}
-              >
-                Place image…
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                onClick={() => {
-                  downloadText("screensaver.txt", exportText);
-                  setDirty(false);
-                  toast("Downloaded screensaver.txt");
-                }}
-              >
-                Download screensaver.txt
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={async () => {
-                  await navigator.clipboard.writeText(exportText);
-                  toast("Copied the canvas as text");
-                }}
-              >
-                Copy all as text
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setApplyOpen(true)}>
-                Apply on Omarchy…
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-            <DropdownMenu>
-            <DropdownMenuTrigger
-              className={buttonVariants({ variant: "ghost", size: "sm" })}
+              New from OMARCHY
+            </BarItem>
+            <BarItem
+              onClick={() => {
+                newBlank();
+                setFileMenu(false);
+              }}
             >
-              Image
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="min-w-52">
-              <DropdownMenuItem
-                onClick={() => {
-                  setResizeCols(doc.cols);
-                  setResizeRows(doc.rows);
-                  setResizeOpen(true);
-                }}
-              >
-                Canvas size…
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => {
-                  pendingImage.current = null;
-                  setPlaceOpen(true);
-                }}
-              >
-                Image → ASCII settings
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button variant="ghost" size="sm" onClick={() => setHelpOpen(true)}>
+              Blank canvas
+            </BarItem>
+            <BarItem
+              onClick={() => {
+                fileRef.current?.click();
+                setFileMenu(false);
+              }}
+            >
+              Open screensaver.txt…
+            </BarItem>
+            <BarItem
+              onClick={() => {
+                imageRef.current?.click();
+                setFileMenu(false);
+              }}
+            >
+              Place image…
+            </BarItem>
+            <BarSep />
+            <BarItem
+              onClick={() => {
+                downloadText("screensaver.txt", exportText);
+                setDirty(false);
+                setFileMenu(false);
+                toast("Downloaded screensaver.txt");
+              }}
+            >
+              Download screensaver.txt
+            </BarItem>
+            <BarItem
+              onClick={() => {
+                void navigator.clipboard.writeText(exportText);
+                setFileMenu(false);
+                toast("Copied the canvas as text");
+              }}
+            >
+              Copy all as text
+            </BarItem>
+            <BarSep />
+            <BarItem
+              onClick={() => {
+                setApplyOpen(true);
+                setFileMenu(false);
+              }}
+            >
+              Apply on Omarchy…
+            </BarItem>
+          </BarMenu>
+          <BarMenu
+            label="Image"
+            open={imageMenu}
+            onToggle={() => {
+              setImageMenu((v) => !v);
+              setFileMenu(false);
+            }}
+            onClose={() => setImageMenu(false)}
+          >
+            <BarItem
+              onClick={() => {
+                setResizeCols(doc.cols);
+                setResizeRows(doc.rows);
+                setResizeOpen(true);
+                setImageMenu(false);
+              }}
+            >
+              Canvas size…
+            </BarItem>
+            <BarItem
+              onClick={() => {
+                pendingImage.current = null;
+                setPlaceOpen(true);
+                setImageMenu(false);
+              }}
+            >
+              Image → ASCII settings
+            </BarItem>
+          </BarMenu>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => setHelpOpen(true)}
+          >
             Help
           </Button>
           <div className="ml-auto flex items-center gap-1">
@@ -718,11 +757,33 @@ export function Studio() {
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div className="flex h-9 shrink-0 items-center gap-3 border-b border-zinc-800 bg-zinc-900/80 px-3 text-xs text-zinc-400">
               {tool === "type" ? (
-                <span>
-                  Click the canvas and type. Glyphs land where you clicked —
-                  Enter commits, Esc cancels. Full ASCII, including digits and
-                  punctuation.
-                </span>
+                <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <span className="shrink-0">Type on the grid</span>
+                  {typeSession ? (
+                    <input
+                      ref={typeInputRef}
+                      data-testid="type-input"
+                      value={typeSession.buffer}
+                      autoComplete="off"
+                      aria-label="Wordmark text"
+                      placeholder="Type here — it stamps where you clicked"
+                      className="h-7 min-w-0 flex-1 rounded border border-emerald-700 bg-black px-2 font-mono text-sm text-emerald-200 outline-none"
+                      onChange={(event) => applyTypeBuffer(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          endTypeSession(true);
+                        }
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          endTypeSession(false);
+                        }
+                      }}
+                    />
+                  ) : (
+                    <span>Click the paper, then type. Enter commits.</span>
+                  )}
+                </div>
               ) : (
                 <>
                   <span className="flex items-center gap-2">
@@ -857,40 +918,13 @@ export function Studio() {
         }}
       />
 
-      <Dialog open={resizeOpen} onOpenChange={setResizeOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Canvas size</DialogTitle>
-            <DialogDescription>
-              Screensaver art is character cells, not pixels. 100×28 fits a
-              typical Omarchy wordmark with room to paint.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="cols">Columns</Label>
-              <Input
-                id="cols"
-                type="number"
-                min={8}
-                max={300}
-                value={resizeCols}
-                onChange={(e) => setResizeCols(Number(e.target.value))}
-              />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="rows">Rows</Label>
-              <Input
-                id="rows"
-                type="number"
-                min={4}
-                max={120}
-                value={resizeRows}
-                onChange={(e) => setResizeRows(Number(e.target.value))}
-              />
-            </div>
-          </div>
-          <DialogFooter>
+      <Modal
+        open={resizeOpen}
+        title="Canvas size"
+        description="Screensaver art is character cells, not pixels. 100×28 fits a typical Omarchy wordmark with room to paint."
+        onClose={() => setResizeOpen(false)}
+        footer={
+          <>
             <Button variant="outline" onClick={() => setResizeOpen(false)}>
               Cancel
             </Button>
@@ -904,45 +938,42 @@ export function Studio() {
             >
               Resize
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={placeOpen} onOpenChange={setPlaceOpen}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle>Place image as ASCII</DialogTitle>
-            <DialogDescription>
-              Stamps onto this canvas. Full ASCII uses every printable
-              character. Omarchy 3 is the old █ ▀ ▄ converter.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            <div className="grid gap-1.5">
-              <Label htmlFor="ramp">Character ramp</Label>
-              <select
-                id="ramp"
-                className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
-                value={rampName}
-                onChange={(e) =>
-                  setRampName(e.target.value as keyof typeof RAMPS)
-                }
-              >
-                <option value="full">Full ASCII (all 95)</option>
-                <option value="omarchy3">Omarchy 3 (█ ▀ ▄)</option>
-                <option value="blocks">Blocks (█▓▒░)</option>
-              </select>
-            </div>
-            <label className="flex items-center gap-2 text-sm">
-              <input
-                type="checkbox"
-                checked={invertPlace}
-                onChange={(e) => setInvertPlace(e.target.checked)}
-              />
-              Invert (light logo on dark)
-            </label>
+          </>
+        }
+      >
+        <div className="grid grid-cols-2 gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="cols">Columns</Label>
+            <Input
+              id="cols"
+              type="number"
+              min={8}
+              max={300}
+              value={resizeCols}
+              onChange={(e) => setResizeCols(Number(e.target.value))}
+            />
           </div>
-          <DialogFooter>
+          <div className="grid gap-1.5">
+            <Label htmlFor="rows">Rows</Label>
+            <Input
+              id="rows"
+              type="number"
+              min={4}
+              max={120}
+              value={resizeRows}
+              onChange={(e) => setResizeRows(Number(e.target.value))}
+            />
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        open={placeOpen}
+        title="Place image as ASCII"
+        description="Stamps onto this canvas. Full ASCII uses every printable character. Omarchy 3 is the old █ ▀ ▄ converter."
+        onClose={() => setPlaceOpen(false)}
+        footer={
+          <>
             <Button variant="outline" onClick={() => setPlaceOpen(false)}>
               Close
             </Button>
@@ -961,36 +992,48 @@ export function Studio() {
               <ImageIcon data-icon="inline-start" />
               Choose image
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        <div className="grid gap-3">
+          <div className="grid gap-1.5">
+            <Label htmlFor="ramp">Character ramp</Label>
+            <select
+              id="ramp"
+              className="h-8 rounded-lg border border-zinc-700 bg-zinc-950 px-2 text-sm"
+              value={rampName}
+              onChange={(e) =>
+                setRampName(e.target.value as keyof typeof RAMPS)
+              }
+            >
+              <option value="full">Full ASCII (all 95)</option>
+              <option value="omarchy3">Omarchy 3 (█ ▀ ▄)</option>
+              <option value="blocks">Blocks (█▓▒░)</option>
+            </select>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={invertPlace}
+              onChange={(e) => setInvertPlace(e.target.checked)}
+            />
+            Invert (light logo on dark)
+          </label>
+        </div>
+      </Modal>
 
-      <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Apply on Omarchy</DialogTitle>
-            <DialogDescription>
-              The screensaver reads one file. Download the canvas, then drop it
-              where Omarchy already looks.
-            </DialogDescription>
-          </DialogHeader>
-          <ol className="list-decimal space-y-2 pl-4 text-sm text-zinc-300">
-            <li>Save downloads <code className="font-mono text-xs">screensaver.txt</code>.</li>
-            <li>
-              On the laptop:{" "}
-              <code className="font-mono text-xs">
-                cp ~/Downloads/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
-              </code>
-            </li>
-            <li>
-              Preview with Super+Esc, or Style → Screensaver. Any key walks out.
-            </li>
-          </ol>
-          <DialogFooter>
+      <Modal
+        open={applyOpen}
+        title="Apply on Omarchy"
+        description="The screensaver reads one file. Download the canvas, then drop it where Omarchy already looks."
+        onClose={() => setApplyOpen(false)}
+        wide
+        footer={
+          <>
             <Button
               variant="outline"
-              onClick={async () => {
-                await navigator.clipboard.writeText(
+              onClick={() => {
+                void navigator.clipboard.writeText(
                   "cp ~/Downloads/screensaver.txt ~/.config/omarchy/branding/screensaver.txt",
                 );
                 toast("Copied the cp command");
@@ -1007,29 +1050,45 @@ export function Studio() {
               <Download data-icon="inline-start" />
               Download
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </>
+        }
+      >
+        <ol className="list-decimal space-y-2 pl-4 text-sm text-zinc-300">
+          <li>
+            Save downloads{" "}
+            <code className="font-mono text-xs">screensaver.txt</code>.
+          </li>
+          <li>
+            On the laptop:{" "}
+            <code className="font-mono text-xs">
+              cp ~/Downloads/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
+            </code>
+          </li>
+          <li>
+            Preview with Super+Esc, or Style → Screensaver. Any key walks out.
+          </li>
+        </ol>
+      </Modal>
 
-      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>The canvas is the art</DialogTitle>
-            <DialogDescription>
-              No editor/preview split. Paint, type, and stamp on the same
-              grid the screensaver will show.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-2 font-mono text-xs text-zinc-300">
-            <p>V select · B pencil · E eraser · G fill · I eyedropper</p>
-            <p>L line · U rectangle · T type wordmark</p>
-            <p>Any printable key sets the brush (when not typing)</p>
-            <p>Ctrl/⌘ Z undo · Shift+Ctrl/⌘ Z redo · Ctrl/⌘ S save</p>
-            <p>Wheel zoom · middle-drag or right-drag pan · Space grab</p>
-            <p>Type tool uses the full Delta Corps Priest set, not just letters.</p>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <Modal
+        open={helpOpen}
+        title="The canvas is the art"
+        description="No editor/preview split. Paint, type, and stamp on the same grid the screensaver will show."
+        onClose={() => setHelpOpen(false)}
+        wide
+        footer={
+          <Button onClick={() => setHelpOpen(false)}>Close</Button>
+        }
+      >
+        <div className="grid gap-2 font-mono text-xs text-zinc-300">
+          <p>V select · B pencil · E eraser · G fill · I eyedropper</p>
+          <p>L line · U rectangle · T type wordmark</p>
+          <p>Any printable key sets the brush (when not typing)</p>
+          <p>Ctrl/⌘ Z undo · Shift+Ctrl/⌘ Z redo · Ctrl/⌘ S save</p>
+          <p>Wheel zoom · middle-drag or right-drag pan · Space grab</p>
+          <p>Type tool uses the full Delta Corps Priest set, not just letters.</p>
+        </div>
+      </Modal>
 
       <Toaster theme="dark" position="bottom-right" />
     </>
