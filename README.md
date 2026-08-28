@@ -75,13 +75,3 @@ cp ~/Downloads/screensaver.txt ~/.config/omarchy/branding/screensaver.txt
 ```
 
 No root. Super + Esc fires the screensaver. Or Super + Space → Style → Screensaver.
-
-## The old editor
-
-The original three-glyph grid (█ ▄ ▀, with a separate preview) is in `legacy/`:
-
-```bash
-python3 legacy/screensaver-editor.py
-```
-
-That one's http://127.0.0.1:8099 and writes the same branding file.
