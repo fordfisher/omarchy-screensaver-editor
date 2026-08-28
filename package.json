@@ -7,7 +7,7 @@
     "build": "tsc --noEmit && vite build",
     "start": "vite preview --host 0.0.0.0 --port 43147",
     "lint": "eslint src",
-    "test": "tsx --test src/lib/font.test.ts src/lib/document.test.ts src/lib/ascii-image.test.ts src/lib/defaults.test.ts"
+    "test": "tsx --test src/lib/font.test.ts src/lib/document.test.ts src/lib/ascii-image.test.ts src/lib/defaults.test.ts src/lib/versions.test.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",

@@ -35,6 +35,17 @@ import { BarItem, BarMenu, BarSep, Modal } from "@/components/studio/chrome";
 import { ImageConverter } from "@/components/studio/converter";
 import { wordmarkDoc } from "@/lib/defaults";
 import {
+  dropVersion,
+  ensurePinned,
+  formatVersionTime,
+  pushVersion,
+  readStoredVersions,
+  versionFilename,
+  WORDMARK_VERSION_ID,
+  writeStoredVersions,
+  type ScreensaverVersion,
+} from "@/lib/versions";
+import {
   cloneDoc,
   copyRect,
   createDoc,
@@ -96,6 +107,8 @@ export function Studio() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
   const [converterOpen, setConverterOpen] = useState(false);
+  const [versionsOpen, setVersionsOpen] = useState(false);
+  const [versions, setVersions] = useState<ScreensaverVersion[]>([]);
   const [fileMenu, setFileMenu] = useState(false);
   const [imageMenu, setImageMenu] = useState(false);
   const typeInputRef = useRef<HTMLInputElement>(null);
@@ -350,13 +363,51 @@ export function Studio() {
 
   const exportText = useMemo(() => toText(doc), [doc]);
 
+  const persistVersions = useCallback((list: ScreensaverVersion[]) => {
+    writeStoredVersions(list);
+    setVersions(list);
+  }, []);
+
+  const snapshot = useCallback((label: string, source = doc) => {
+    setVersions((list) => {
+      const next = pushVersion(list, {
+        label,
+        createdAt: Date.now(),
+        text: toText(source),
+      });
+      writeStoredVersions(next);
+      return next;
+    });
+  }, [doc]);
+
+  useEffect(() => {
+    const wordmarkText = toText(wordmarkDoc("OMARCHY"));
+    const pinned = {
+      id: WORDMARK_VERSION_ID,
+      label: "OMARCHY wordmark",
+      createdAt: 0,
+      text: wordmarkText,
+      pinned: true as const,
+    };
+    let list = ensurePinned(readStoredVersions(), pinned);
+    list = pushVersion(list, {
+      label: "Session start",
+      createdAt: Date.now(),
+      text: toText(doc),
+    });
+    persistVersions(list);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed pin + current canvas once
+  }, []);
+
   const newBlank = () => {
+    snapshot("Before blank canvas");
     endTypeSession(false);
     commit(createDoc(doc.cols, doc.rows));
     setMarquee(null);
   };
 
   const newWordmark = (text = "OMARCHY") => {
+    snapshot("Before new wordmark");
     endTypeSession(false);
     commit(wordmarkDoc(text));
     setMarquee(null);
@@ -364,6 +415,7 @@ export function Studio() {
 
   const openTextFile = async (file: File) => {
     const text = await file.text();
+    snapshot("Before open");
     endTypeSession(false);
     commit(fromText(text, 40, 12));
     setMarquee(null);
@@ -371,10 +423,27 @@ export function Studio() {
   };
 
   const stampConverted = (lines: string[]) => {
+    snapshot("Before convert");
     const next = cloneDoc(doc);
     stampLines(next, 0, 0, lines, false);
     commit(next);
     toast("Image stamped on the canvas");
+  };
+
+  const saveCurrent = (toastMessage = "Saved screensaver.txt") => {
+    snapshot("Saved");
+    downloadText("screensaver.txt", toText(doc));
+    setDirty(false);
+    toast(toastMessage);
+  };
+
+  const restoreVersion = (version: ScreensaverVersion) => {
+    snapshot("Before restore");
+    endTypeSession(false);
+    commit(fromText(version.text, 40, 12));
+    setMarquee(null);
+    setVersionsOpen(false);
+    toast("Restored " + version.label);
   };
 
   useEffect(() => {
@@ -404,9 +473,7 @@ export function Studio() {
       }
       if (meta && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        downloadText("screensaver.txt", toText(doc));
-        setDirty(false);
-        toast("Saved screensaver.txt");
+        saveCurrent();
         return;
       }
       if (meta && event.key.toLowerCase() === "c" && marquee) {
@@ -498,7 +565,7 @@ export function Studio() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onUp);
     };
-  }, [doc, endTypeSession, marquee, redoOnce, typeSession, undoOnce]);
+  }, [doc, endTypeSession, marquee, redoOnce, saveCurrent, typeSession, undoOnce]);
 
   const cursor = spaceDown
     ? "grab"
@@ -571,10 +638,8 @@ export function Studio() {
             <BarSep />
             <BarItem
               onClick={() => {
-                downloadText("screensaver.txt", exportText);
-                setDirty(false);
+                saveCurrent("Downloaded screensaver.txt");
                 setFileMenu(false);
-                toast("Downloaded screensaver.txt");
               }}
             >
               Download screensaver.txt
@@ -587,6 +652,14 @@ export function Studio() {
               }}
             >
               Copy all as text
+            </BarItem>
+            <BarItem
+              onClick={() => {
+                setVersionsOpen(true);
+                setFileMenu(false);
+              }}
+            >
+              Versions…
             </BarItem>
             <BarSep />
             <BarItem
@@ -683,6 +756,7 @@ export function Studio() {
               size="sm"
               className="ml-2"
               onClick={() => {
+                snapshot("Saved");
                 downloadText("screensaver.txt", exportText);
                 setDirty(false);
                 setApplyOpen(true);
@@ -848,8 +922,16 @@ export function Studio() {
             {typeSession ? ` · typing “${typeSession.buffer}”` : ""}
           </span>
           <span className="ml-auto truncate text-zinc-600">
-            {dirty ? "unsaved" : "saved"} · {printableAscii().length} ASCII
-            glyphs in the wordmark font
+            {dirty ? "unsaved" : "saved"} ·{" "}
+            <button
+              type="button"
+              className="hover:text-zinc-300"
+              onClick={() => setVersionsOpen(true)}
+            >
+              {versions.length} version{versions.length === 1 ? "" : "s"}
+            </button>
+            {" · "}
+            {printableAscii().length} ASCII glyphs in the wordmark font
           </span>
         </footer>
       </div>
@@ -943,6 +1025,7 @@ export function Studio() {
             </Button>
             <Button
               onClick={() => {
+                snapshot("Saved");
                 downloadText("screensaver.txt", exportText);
                 setDirty(false);
               }}
@@ -988,7 +1071,75 @@ export function Studio() {
           <p>Wheel zoom · middle-drag or right-drag pan · Space grab</p>
           <p>Type tool uses the full Delta Corps Priest set, not just letters.</p>
           <p>File → Convert JPG/PNG maps grayscale 0–100% onto the canvas.</p>
+          <p>File → Versions restores earlier screensaver.txt copies (OMARCHY is pinned).</p>
         </div>
+      </Modal>
+
+      <Modal
+        open={versionsOpen}
+        title="Screensaver versions"
+        description="Copies stay in this browser. Restore the OMARCHY wordmark, or any save from before a convert/stamp. Downloads use dated filenames so they do not overwrite screensaver.txt."
+        onClose={() => setVersionsOpen(false)}
+        wide
+        footer={<Button onClick={() => setVersionsOpen(false)}>Close</Button>}
+      >
+        <ul className="grid max-h-80 gap-2 overflow-auto pr-1">
+          {versions.map((version) => (
+            <li
+              key={version.id}
+              className="flex items-start justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2"
+            >
+              <div className="min-w-0">
+                <div className="truncate text-sm text-zinc-100">
+                  {version.label}
+                  {version.pinned ? (
+                    <span className="ml-2 font-mono text-[10px] uppercase tracking-wide text-emerald-400">
+                      pinned
+                    </span>
+                  ) : null}
+                </div>
+                <div className="font-mono text-[11px] text-zinc-500">
+                  {version.pinned
+                    ? "The stock wordmark"
+                    : formatVersionTime(version.createdAt)}
+                  {" · "}
+                  {versionFilename(version.createdAt, version.pinned)}
+                </div>
+              </div>
+              <div className="flex shrink-0 gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    downloadText(
+                      versionFilename(version.createdAt, version.pinned),
+                      version.text.endsWith("\n")
+                        ? version.text
+                        : `${version.text}\n`,
+                    );
+                    toast("Downloaded " + versionFilename(version.createdAt, version.pinned));
+                  }}
+                >
+                  Download
+                </Button>
+                <Button size="sm" onClick={() => restoreVersion(version)}>
+                  Restore
+                </Button>
+                {version.pinned ? null : (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      persistVersions(dropVersion(versions, version.id))
+                    }
+                  >
+                    Drop
+                  </Button>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
       </Modal>
 
       <Toaster theme="dark" position="bottom-right" />

@@ -66,6 +66,8 @@ Type: click a cell, type `OMARCHY 4.0!`, Enter commits, Esc cancels. The glyphs 
 
 **File → Convert JPG/PNG** (or **Image → Convert JPG/PNG**) turns a photo into ASCII. Each pixel is a grayscale percent: **0% black → dense glyph**, **100% white → empty**. Drag the black/white points to stretch the range, then stamp onto the canvas.
 
+**File → Versions** keeps copies in the browser. The OMARCHY wordmark is pinned. Save, convert, and new canvas snapshot the previous art. Restore puts it back on the grid; Download uses a dated `screensaver-YYYYMMDD-HHMMSS.txt` so it does not overwrite `screensaver.txt`.
+
 ## Put it on the screensaver
 
 **Save** downloads `screensaver.txt`. Drop it where Omarchy already looks:
